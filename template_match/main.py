@@ -3,7 +3,7 @@
 # File              : main.py
 # Author            : Hai-Yong Jiang <haiyong.jiang1990@hotmail.com>
 # Date              : 08.05.2019
-# Last Modified Date: 11.05.2019
+# Last Modified Date: 15.05.2019
 # Last Modified By  : Hai-Yong Jiang <haiyong.jiang1990@hotmail.com>
 
 # Python program to illustrate
@@ -26,19 +26,34 @@ def nms(locs, scores, th):
     if len(scores) == 0:
         return [], [], []
 
-    idxs = np.argsort(scores)
+    ## remove redudency by hashing
+    #  print("detected: ", len(scores))
+    #  hash_val = (locs[0]%128)*128+ (locs[1]%128)
+    #  _, idxs_uni = np.unique(hash_val, return_index=True)
+    #  locs = locs[:, idxs_uni]
+    #  scores = scores[idxs_uni]
+    #  print("remove redundency: ", len(scores))
+
+    idxs = np.argsort(scores)[::-1]
     idxs_select = []
     #  print("inputs: ", locs)
     while len(idxs) > 0:
         idx_cur = idxs[-1]
         idxs_select.append(idx_cur)
+        if len(idxs_select) > 1000:
+            break
 
+        #  print(idx_cur, locs)
         loc_cur = locs[:, idx_cur]
         ratios = np.linalg.norm(locs - loc_cur.reshape(2, 1), axis=0)
+        idxs_rm = np.where(ratios<=th)
+        idxs_n = []
+        for idx in idxs:
+            if not np.any(idxs_rm == idx):
+                idxs_n.append(idx)
+        idxs = np.array(idxs_n)
 
-        idxs = np.delete(idxs, np.concatenate(([idx_cur], np.where(ratios<=th)[0])))
-
-    #  print("selected: ", locs[:, idxs_select])
+    #  print("after nms: ", len(idxs_select))
     return locs[:,idxs_select], scores[idxs_select], idxs_select
 
 
@@ -144,15 +159,16 @@ def match_template(fpath_mainimage, fpath_template, th=0.35, minscale=0.5, maxsc
 
     corners = corners + max_loc.transpose(1,0).reshape(-1, 1, 2)
     corners = corners.astype(np.int32)
-#      for ii in range(len(corners)):
-    #      pts = corners[ii].reshape(-1, 1, 2)
-    #      cv2.polylines(img_rgb, [pts], True, (0, 255, 255))
+    for ii in range(len(corners)):
+        pts = corners[ii].reshape(-1, 1, 2)
+        cv2.polylines(img_rgb, [pts], True, (0, 255, 255))
     #  cv2.imshow("Image", img_rgb)
     #  cv2.waitKey(0)
 
     fname = os.path.basename(fpath_template)
+    cv2.imwrite(fpath_mainimage + "_" + fname + ".png", img_rgb)
     print("Results are saved to " + fpath_mainimage + "_" + fname + ".txt")
-    save_corners(fpath_mainimage + ".txt", corners)
+    save_corners(fpath_mainimage + "_" + fname + ".txt", corners)
     return corners
 
 def save_corners(fpath, corners):
